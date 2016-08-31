@@ -1,11 +1,38 @@
 
+import math
 import pprint
 import csv
 import re
+import json
+import operator
 from collections import defaultdict
 from functools import partial
 
 SPLITTER = re.compile('\W*')
+
+_STATE_FILE = '_state.json'
+
+
+class CATEGORY:
+    POSITIVE = 'positive'
+    NEGATIVE = 'negative'
+    UNKNOWN = 'unknown'
+
+    __ALL__ = (
+        POSITIVE,
+        NEGATIVE,
+        UNKNOWN,
+    )
+
+
+def state_save(state):
+    with open(_STATE_FILE, 'wb') as f:
+        json.dump(state, f)
+
+
+def state_load():
+    with open(_STATE_FILE, 'rb') as f:
+        return json.load(f)
 
 
 def init_state():
@@ -40,7 +67,11 @@ def learn(state, text, category):
 
 
 def parse_category(category_str):
-    return bool(int(category_str))
+    if '0' == category_str:
+        return CATEGORY.NEGATIVE
+    if '1' == category_str:
+        return CATEGORY.POSITIVE
+    return CATEGORY.UNKNOWN
 
 
 def populate_state(state):
@@ -51,11 +82,17 @@ def populate_state(state):
         reader.next()  # skip header
 
         for row in reader:
-            is_str, _category, _, text = row
+            # print row
+            try:
+                is_str, _category, _, text = row
+            except Exception as e:
+                print e
+                continue
+
             learn(state, text, parse_category(_category))
 
-            if is_str == '5000':
-                break
+            # if is_str == '9000':
+            #     break
 
 
 def f_count(state, feature, category):
@@ -102,16 +139,67 @@ def pretty_print(state):
     pprint.pprint(state)
 
 
-def fisher(state):
-    pass
+def p_fisher(state, feature, category):
+
+    prob = p_feature_category(state, feature, category)
+
+    category_list = get_categories(state)
+    prob_list = [p_feature_category(state, feature, cat)
+                 for cat in category_list]
+
+    return div(prob, sum(prob_list))
+
+
+def invchi2(chi, df):
+    m = chi / 2.0
+    sum = term = math.exp(-m)
+    for i in range(1, df//2):
+        term *= m / i
+        sum += term
+    return min(sum, 1.0)
+
+
+def p_fisher_item(state, text, category):
+    feature_list = get_features(text)
+    if not feature_list:
+        return 0
+
+    prob_list = [
+        p_feature_category(state, feature, category)
+        for feature in feature_list
+
+    ]
+
+    mult = reduce(operator.mul, prob_list, 1)
+    if not mult:
+        return 0
+
+    return mult
+
+    score = -2 * math.log(mult)
+    return invchi2(score, len(feature_list) * 2)
 
 
 def main():
-    state = init_state()
-    populate_state(state)
+    # state = init_state()
+    # populate_state(state)
+    # state_save(state)
+    # exit(0)
+
+    state = state_load()
 
     # pretty_print(state)
-    print p_feature_category_w(state, 'love', True)
+    # print p_feature_category_w(state, 'love', True)
+    # print p_fisher(state, 'fuck', CATEGORY.NEGATIVE)
+
+    print p_fisher_item(state, 'I hate you', CATEGORY.NEGATIVE)
+    print p_fisher_item(state, 'I hate you', CATEGORY.POSITIVE)
+
+    print p_fisher_item(state, 'I love you', CATEGORY.NEGATIVE)
+    print p_fisher_item(state, 'I love you', CATEGORY.POSITIVE)
+
+    # print p_fisher_item(state, 'kiss her hug her', CATEGORY.NEGATIVE)
+    # print p_fisher_item(state, 'kiss her hug her', CATEGORY.POSITIVE)
 
 
 if __name__ == '__main__':
