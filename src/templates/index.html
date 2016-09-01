@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <title>Text Sentiment Demo</title>
+    </head>
+    <body>
+        <style>
+            #q {
+            width: 400px;
+            height: 100px;
+            }
+        </style>
+
+        <form method="GET" action="/">
+            <textarea id="q" name="q">{{ q or "Type your text here." }}</textarea>
+            <br>
+            <button type="submit">Submit</button>
+        </form>
+        {% if q %}
+            <p>"{{ q }}" has <b>{{ category }}</b> sentiment.</p>
+        {% endif %}
+    </body>
+</html>

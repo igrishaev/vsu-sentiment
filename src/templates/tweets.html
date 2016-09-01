@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <title>Text Sentiment Demo</title>
+    </head>
+    <body>
+        <h1>Twitter Analyser</h1>
+        <p>Enter your search term in English. The program will grap Twitter search page to get actial tweets.</p>
+        <form method="GET" action="/tweets">
+            <input type="text" id="q" name="q" value="{{ q }}" />
+            <button type="submit">Submit</button>
+        </form>
+        <hr>
+        {% if q and pairs %}
+            <table border="1">
+                <thead>
+                    <tr>
+                        <th>Tweet</th>
+                        <th>Sentiment</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for (tweet, cat) in pairs %}
+                        <tr>
+                            <td>{{ tweet }}</td>
+                            <td>{{ cat }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% endif %}
+    </body>
+</html>

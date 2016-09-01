@@ -1,4 +1,5 @@
 
+import os
 import math
 import csv
 import re
@@ -7,9 +8,16 @@ import operator
 from collections import defaultdict
 from functools import partial
 
+import f
+
 SPLITTER = re.compile('\W*')
 
-_STATE_FILE = '_state.json'
+_STATE_FILE = os.path.abspath(
+    os.path.join(
+        os.path.dirname(__file__),
+        os.pardir,
+        '_state.json'
+    ))
 
 
 class CATEGORY:
@@ -51,17 +59,16 @@ def get_features(text):
     def modify(word):
         return word.lower()
 
-    return map(modify, filter(criteria, word_list))
+    return set(map(modify, filter(criteria, word_list)))
 
 
 def learn(state, text, category):
 
-    feature_list = get_features(text)
-
     state['count'] += 1
     state['category'][category] += 1
 
-    for feature in feature_list:
+    feature_set = get_features(text)
+    for feature in feature_set:
         state['feature'][feature][category] += 1
 
 
@@ -73,19 +80,6 @@ def parse_category(category_str):
     return CATEGORY.UNKNOWN
 
 
-def ichain(obj, *items):
-
-    def get_item(obj, item):
-        if obj is None:
-            return None
-        try:
-            return obj[item]
-        except:
-            return None
-
-    return reduce(get_item, items, obj)
-
-
 def populate_state(state):
 
     with open('source.csv', 'rb') as f:
@@ -94,25 +88,22 @@ def populate_state(state):
         reader.next()  # skip header
 
         for row in reader:
-            # print row
+
             try:
+                # some rows are corrupted
                 is_str, _category, _, text = row
             except Exception as e:
-                print e
                 continue
 
             learn(state, text, parse_category(_category))
 
-            # if is_str == '9000':
-            #     break
-
 
 def f_count(state, feature, category):
-    return ichain(state, 'feature', feature, category) or 0
+    return f.ichain(state, 'feature', feature, category) or 0
 
 
 def c_count(state, category):
-    return ichain(state, 'category', category) or 0
+    return f.ichain(state, 'category', category) or 0
 
 
 def div(a, b):
@@ -133,14 +124,14 @@ def get_categories(state):
     return state['category'].keys()
 
 
-# def p_feature_category_w(state, feature, category, weight=1, assump=0.5):
-#     prob = p_feature_category(state, feature, category)
-#     cats = get_categories(state)
-#     counts = [f_count(state, feature, cat) for cat in cats]
-#     totals = sum(counts)
-#     a = weight * assump + totals * prob
-#     b = weight + totals
-#     return div(a, b)
+def p_feature_category_w(state, feature, category, weight=1, assump=0.5):
+    prob = p_feature_category(state, feature, category)
+    cats = get_categories(state)
+    counts = [f_count(state, feature, cat) for cat in cats]
+    totals = sum(counts)
+    a = weight * assump + totals * prob
+    b = weight + totals
+    return div(a, b)
 
 
 def p_fisher_prob(state, feature, category):
@@ -154,41 +145,35 @@ def p_fisher_prob(state, feature, category):
     return div(prob, sum(prob_list))
 
 
-# def invchi2(chi, df):
-#     m = chi / 2.0
-#     sum = term = math.exp(-m)
-#     for i in range(1, df//2):
-#         term *= m / i
-#         sum += term
-#     return min(sum, 1.0)
+def p_category(state, category):
+    a = f.ichain(state, 'category', category) or 0
+    b = f.ichain(state, 'count') or 0
+    return div(a, b)
 
 
-def p_fisher_item(state, text, category):
+def p_item(state):
+    a = 1
+    b = f.ichain(state, 'count') or 0
+    return div(1, b)
 
-    feature_list = get_features(text)
-    if not feature_list:
-        return 0
 
-    prob_list = [
-        p_fisher_prob(state, feature, category)
-        for feature in feature_list
-
+def p_item_cat(state, item, cat):
+    feature_set = get_features(item)
+    probs = [
+        p_feature_category_w(state, feature, cat)
+        for feature in feature_set
     ]
+    return reduce(operator.mul, probs, 1)
 
-    mult = reduce(operator.mul, prob_list, 1)
-    if not mult:
-        return 0
 
-    return mult
-
-    # score = -2 * math.log(mult)
-    # return invchi2(score, len(feature_list) * 2)
+def p_cat_item(state, item, cat):
+    return p_item_cat(state, item, cat) * p_category(state, cat)
 
 
 def get_text_category(state, text):
     category_list = get_categories(state)
 
-    prob_list = [p_fisher_item(state, text, cat)
+    prob_list = [p_cat_item(state, text, cat)
                  for cat in category_list]
 
     pairs = zip(category_list, prob_list)
@@ -197,35 +182,15 @@ def get_text_category(state, text):
     return pairs[0][0]
 
 
+def learn_save_quit():
+    state = init_state()
+    populate_state(state)
+    state_save(state)
+    exit(0)
+
+
 def main():
-    # state = init_state()
-    # populate_state(state)
-    # state_save(state)
-    # exit(0)
-
-    state = state_load()
-
-    for text in (
-            'I love you',
-            'I hate you',
-            'The movie was pretty good',
-            'The movie was quite boring',
-
-    ):
-        print text, ' -- ', get_text_category(state, text)
-
-    # pretty_print(state)
-    # print p_feature_category_w(state, 'love', True)
-    # print p_fisher(state, 'fuck', CATEGORY.NEGATIVE)
-
-    # print p_fisher_item(state, 'I hate you', CATEGORY.NEGATIVE)
-    # print p_fisher_item(state, 'I hate you', CATEGORY.POSITIVE)
-
-    # print p_fisher_item(state, 'I love you', CATEGORY.NEGATIVE)
-    # print p_fisher_item(state, 'I love you', CATEGORY.POSITIVE)
-
-    # print p_fisher_item(state, 'kiss her hug her', CATEGORY.NEGATIVE)
-    # print p_fisher_item(state, 'kiss her hug her', CATEGORY.POSITIVE)
+    learn_save_quit()
 
 
 if __name__ == '__main__':
