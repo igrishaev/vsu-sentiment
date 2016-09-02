@@ -32,6 +32,13 @@ class CATEGORY:
     )
 
 
+THRESHOLD = {
+    CATEGORY.POSITIVE: 0.7,
+    CATEGORY.NEGATIVE: 0.7,
+    CATEGORY.UNKNOWN: 0,
+}
+
+
 def state_save(state):
     with open(_STATE_FILE, 'wb') as f:
         json.dump(state, f)
@@ -134,20 +141,11 @@ def p_feature_category_w(state, feature, category, weight=1, assump=0.5):
     return div(a, b)
 
 
-def p_fisher_prob(state, feature, category):
-
-    prob = p_feature_category(state, feature, category)
-
-    category_list = get_categories(state)
-    prob_list = [p_feature_category(state, feature, cat)
-                 for cat in category_list]
-
-    return div(prob, sum(prob_list))
-
-
 def p_category(state, category):
-    a = f.ichain(state, 'category', category) or 0
-    b = f.ichain(state, 'count') or 0
+    a = state['category'][category]
+    b = state['count']
+    # a = f.ichain(state, 'category', category) or 0
+    # b = f.ichain(state, 'count') or 0
     return div(a, b)
 
 
@@ -170,6 +168,26 @@ def p_cat_item(state, item, cat):
     return p_item_cat(state, item, cat) * p_category(state, cat)
 
 
+def coerce_category(ratio_pairs):
+
+    for (cat, rat) in sorted(ratio_pairs, key=lambda (cat, rat): -rat):
+        if rat > THRESHOLD[cat]:
+            return cat
+
+    return CATEGORY.UNKNOWN
+
+
+def get_ratio_pairs(pair_list):
+    prob_sum = sum([prob for (_, prob) in pair_list])
+    ratio_list = [div(prob, prob_sum) for (_, prob) in pair_list]
+    composed = [
+        (cat, rat)
+        for ((cat, _), rat)
+        in zip(pair_list, ratio_list)
+    ]
+    return composed
+
+
 def get_text_category(state, text):
     category_list = get_categories(state)
 
@@ -177,9 +195,9 @@ def get_text_category(state, text):
                  for cat in category_list]
 
     pairs = zip(category_list, prob_list)
-    pairs.sort(key=(lambda (cat, prob): -prob))
+    ratio_pairs = get_ratio_pairs(pairs)
 
-    return pairs[0][0]
+    return coerce_category(ratio_pairs)
 
 
 def learn_save_quit():
@@ -191,6 +209,11 @@ def learn_save_quit():
 
 def main():
     learn_save_quit()
+
+    # state = state_load()
+    # print get_text_category(state, 'dsfgsdfg88sfsd')
+    # print get_text_category(state, 'love')
+    # print get_text_category(state, 'hate')
 
 
 if __name__ == '__main__':
