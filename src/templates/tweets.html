@@ -4,10 +4,16 @@
         <title>Text Sentiment Demo</title>
     </head>
     <body>
+        <style>
+            #q {
+            width: 400px;
+            }
+        </style>
+        {% include "nav.html" %}
         <h1>Twitter Analyser</h1>
-        <p>Enter your search term in English. The program will grap Twitter search page to get actial tweets.</p>
+        <p>Enter your search term in English. The program will grap Twitter search page to get actual tweets.</p>
         <form method="GET" action="/tweets">
-            <input type="text" id="q" name="q" value="{{ q }}" />
+            <input type="text" id="q" name="q" value="{{ q or "e.g. NASA, BBC, etc" }}" />
             <button type="submit">Submit</button>
         </form>
         <hr>

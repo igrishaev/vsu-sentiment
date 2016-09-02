@@ -10,7 +10,9 @@
             height: 100px;
             }
         </style>
-
+        {% include "nav.html" %}
+        <h1>Text Analyser</h1>
+        <p>Enter your text in English.</p>
         <form method="GET" action="/">
             <textarea id="q" name="q">{{ q or "Type your text here." }}</textarea>
             <br>

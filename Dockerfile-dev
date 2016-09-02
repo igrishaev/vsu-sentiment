@@ -8,6 +8,4 @@ WORKDIR /app
 RUN pip install -r pip.requirements.txt
 RUN rm pip.requirements*
 
-COPY src /app
-
 CMD ["uwsgi", "uwsgi.ini"]
